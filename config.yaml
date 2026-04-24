@@ -1,0 +1,89 @@
+# DeepSeek API Configuration
+llm:
+  provider: deepseek
+  model: deepseek-chat
+  api_key: "YOUR_DEEPSEEK_API_KEY"  # Replace with your key
+  api_base: "https://api.deepseek.com/v1"
+  openai_format: true
+  temperature: 0.7
+  max_tokens: 2000
+
+# Model Configuration
+model:
+  mlp:
+    input_dim: 64       # Feature vector dimension (zeros for unconditioned training)
+    hidden_dims: [512, 256, 128]
+    output_dim: 64      # Latent vector dimension
+    dropout: 0.2
+
+  mamba:
+    vocab_size: 128     # ASCII printable characters
+    d_model: 128        # Model dimension
+    n_layers: 4         # Number of MAMBA layers
+    d_state: 16         # State dimension
+    d_conv: 4           # Convolution kernel size
+    max_length: 32      # Maximum password length
+
+# Differential Evolution Configuration
+optimization:
+  population_size: 100
+  max_generations: 50
+  mutation_rate: 0.8
+  crossover_rate: 0.7
+  elite_ratio: 0.1
+
+# Training Configuration
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  epochs: 100
+  device: cuda         # or 'cpu'
+
+# Penetration Testing Configuration
+pentest:
+  enabled: true
+  max_steps: 100
+  auto_mode: true
+  reflection_frequency: 5
+  state_dim: 256
+  action_dim: 900
+  learning_rate: 0.0003
+  allowed_targets: []
+  enable_attack_team: true       # Enable attack team collaboration
+  enable_self_improvement: true   # Enable self-improvement loop
+  persist_sessions: true
+  session_path: "data/sessions"
+  team_mode: "collaborative"     # 'collaborative', 'hierarchical', 'voting'
+
+# Reinforcement Learning Configuration
+rl:
+  algorithm: ppo           # ppo, dqn, a2c
+  learning_rate: 0.0003
+  gamma: 0.99
+  batch_size: 32
+  reflection_enabled: true
+  reflection_frequency: 5
+
+# RAG Knowledge Base Configuration
+rag:
+  vector_store_dir: "data/vector_store"
+  embedding_model: "all-MiniLM-L6-v2"
+  max_context_tokens: 2000
+  semantic_weight: 0.6          # Weight for semantic vs keyword in hybrid search
+  hybrid_search: true
+
+# Self-Improvement Configuration
+self_improvement:
+  experience_buffer_size: 10000
+  lessons_db_path: "data/lessons.json"
+  curriculum_difficulty: "auto"   # easy, medium, hard, auto
+  meta_learning_interval: 100
+  enable_reward_shaping: true
+  enable_curriculum: true
+
+# Knowledge Base Configuration
+knowledge:
+  cve_api_base: "https://services.nvd.nist.gov/rest/json/cves/2.0"
+  attack_data_path: "data/enterprise-attack.json"
+  cache_enabled: true
+  preload_cves: 100

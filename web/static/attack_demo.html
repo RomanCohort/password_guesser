@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM + MOE + Attack Team Demo</title>
+    <style>
+        :root {
+            --bg-primary: #0f1419;
+            --bg-secondary: #1a1f26;
+            --bg-tertiary: #242b33;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-green: #3fb950;
+            --accent-blue: #58a6ff;
+            --accent-orange: #f0883e;
+            --accent-red: #f85149;
+            --accent-purple: #a371f7;
+            --accent-yellow: #d29922;
+            --border-color: #30363d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Ubuntu', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1a1f26 0%, #242b33 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-info {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-badge.green { background: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
+        .status-badge.yellow { background: rgba(240, 136, 62, 0.2); color: var(--accent-orange); }
+        .status-badge.red { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
+
+        /* Main Layout */
+        .main-container {
+            display: grid;
+            grid-template-columns: 320px 1fr 320px;
+            gap: 1rem;
+            padding: 1rem 2rem;
+            min-height: calc(100vh - 70px);
+        }
+
+        /* Panel Styles */
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: var(--bg-tertiary);
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header h2 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-header .icon {
+            width: 16px;
+            height: 16px;
+        }
+
+        .panel-content {
+            padding: 1rem;
+        }
+
+        /* Left Panel - Expert System */
+        .expert-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .expert-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .expert-item:hover {
+            border-color: var(--accent-blue);
+            transform: translateX(4px);
+        }
+
+        .expert-item.active {
+            border-color: var(--accent-green);
+            background: rgba(63, 185, 80, 0.1);
+        }
+
+        .expert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .expert-name {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .expert-confidence {
+            font-size: 0.75rem;
+            padding: 0.125rem 0.5rem;
+            border-radius: 1rem;
+            background: var(--bg-primary);
+        }
+
+        .expert-tools {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            margin-top: 0.5rem;
+        }
+
+        .tool-tag {
+            font-size: 0.625rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--accent-blue);
+        }
+
+        /* Center Panel - Visualization */
+        .attack-visualization {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .timeline {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-left: 2rem;
+            padding-bottom: 1.5rem;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 0.5rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border-color);
+        }
+
+        .timeline-item:last-child::before {
+            display: none;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: 0.25rem;
+            top: 0.25rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+        }
+
+        .timeline-item.active .timeline-dot {
+            background: var(--accent-green);
+            border-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        .timeline-content {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .phase-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-weight: 500;
+        }
+
+        .phase-recon { background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+        .phase-exploit { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
+        .phase-post { background: rgba(163, 113, 247, 0.2); color: var(--accent-purple); }
+        .phase-lateral { background: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
+
+        .reward-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: rgba(240, 136, 62, 0.2);
+            color: var(--accent-orange);
+        }
+
+        .timeline-body {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .routing-info {
+            display: flex;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+        }
+
+        .expert-chip {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: var(--bg-primary);
+        }
+
+        .expert-chip.primary { border: 1px solid var(--accent-green); }
+        .expert-chip.support { border: 1px solid var(--accent-blue); }
+
+        /* Right Panel - Attack Team */
+        .team-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .team-member {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .team-member.active {
+            border-color: var(--accent-yellow);
+            box-shadow: 0 0 10px rgba(210, 153, 34, 0.3);
+        }
+
+        .team-member.speaking {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.4); }
+            50% { box-shadow: 0 0 10px 4px rgba(210, 153, 34, 0.4); }
+        }
+
+        .member-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 auto 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+
+        .member-name {
+            font-weight: 600;
+            font-size: 0.75rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .member-role {
+            font-size: 0.625rem;
+            color: var(--text-secondary);
+        }
+
+        /* Control Buttons */
+        .controls {
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            flex: 1;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4c9aff;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        /* API Key Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal h3 {
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        /* Progress Indicator */
+        .attack-progress {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+            transition: width 0.5s;
+        }
+
+        .progress-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Loading Animation */
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Hidden */
+        .hidden { display: none !important; }
+
+        /* Stats Cards */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .stat-card {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .stat-label {
+            font-size: 0.625rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        /* Decision Flow */
+        .decision-flow {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .decision-flow h4 {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .flow-steps {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .flow-step {
+            background: var(--bg-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .flow-arrow {
+            color: var(--text-secondary);
+        }
+
+        /* Meeting Output */
+        .meeting-output {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .meeting-output pre {
+            font-size: 0.75rem;
+            white-space: pre-wrap;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- API Key Modal -->
+    <div id="apiKeyModal" class="modal-overlay">
+        <div class="modal">
+            <h3>Configure LLM Provider</h3>
+            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                Optionally provide your DeepSeek API key to enable full LLM analysis.
+                Without it, the system will use rule-based mode.
+            </p>
+            <div class="form-group">
+                <label>Provider</label>
+                <select id="llmProvider" style="width:100%; padding:0.75rem; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-primary); color:var(--text-primary);">
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="vllm">vLLM</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>API Key (optional)</label>
+                <input type="password" id="apiKeyInput" placeholder="sk-...">
+            </div>
+            <div class="form-group">
+                <label>Model</label>
+                <input type="text" id="modelInput" value="deepseek-chat">
+            </div>
+            <button class="btn btn-primary" onclick="initSystem()" style="width: 100%;">Initialize System</button>
+            <button class="btn btn-secondary" onclick="skipLLM()" style="width: 100%; margin-top: 0.5rem;">Continue without LLM</button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <h1>LLM + MOE + Attack Team Demo</h1>
+        <div class="header-info">
+            <span id="llmStatus" class="status-badge yellow">Initializing...</span>
+            <span id="phaseStatus" class="status-badge blue">Idle</span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Left Panel - Expert System -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v6l4 2"/>
+                    </svg>
+                    MOE Expert Router
+                </h2>
+            </div>
+            <div class="panel-content">
+                <div id="expertList" class="expert-list">
+                    <!-- Expert items will be populated by JavaScript -->
+                </div>
+
+                <div class="decision-flow">
+                    <h4>Decision Flow</h4>
+                    <div class="flow-steps">
+                        <div class="flow-step">State</div>
+                        <span class="flow-arrow">→</span>
+                        <div class="flow-step">Router</div>
+                        <span class="flow-arrow">→</span>
+                        <div class="flow-step">Expert</div>
+                        <span class="flow-arrow">→</span>
+                        <div class="flow-step">Action</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Panel - Visualization -->
+        <div class="panel attack-visualization">
+            <div class="attack-progress">
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div class="progress-stats">
+                    <span>Step: <span id="currentStep">0</span>/8</span>
+                    <span>Reward: <span id="totalReward">0.0</span></span>
+                    <span>Consensus: <span id="consensus">0%</span></span>
+                </div>
+            </div>
+
+            <div id="timeline" class="timeline">
+                <div class="timeline-item" style="padding-left: 0;">
+                    <div class="timeline-content">
+                        <p style="text-align: center; color: var(--text-secondary);">
+                            Click "Start Attack" to begin the simulation
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-primary" id="startBtn" onclick="startAttack()">
+                    Start Attack
+                </button>
+                <button class="btn btn-secondary" id="stepBtn" onclick="stepAttack()">
+                    Next Step
+                </button>
+                <button class="btn btn-danger" onclick="resetAttack()">
+                    Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Panel - Attack Team -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    Attack Team (7)
+                </h2>
+            </div>
+
+            <div id="teamGrid" class="team-grid panel-content">
+                <!-- Team members will be populated by JavaScript -->
+            </div>
+
+            <div id="meetingOutput" class="meeting-output hidden">
+                <h4 style="margin-bottom: 0.5rem; font-size: 0.75rem;">Last Meeting</h4>
+                <pre id="meetingText"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE = '/api/attack-demo';
+
+        // State
+        let systemInitialized = false;
+        let attackHistory = [];
+        let currentStep = 0;
+        let totalReward = 0;
+        let experts = [];
+        let teamMembers = [];
+        let ws = null;
+
+        // Expert names mapping
+        const expertNames = {
+            'reconnaissance': 'Scout',
+            'vulnerability': 'Analyst',
+            'exploitation': 'Striker',
+            'post_exploitation': 'Ghost',
+            'credential': 'Hunter',
+            'lateral_movement': 'Phantom'
+        };
+
+        // Team avatars
+        const avatars = {
+            'Commander': '🕶️',
+            'Scout': '🔍',
+            'Analyst': '📊',
+            'Striker': '💥',
+            'Ghost': '👻',
+            'Hunter': '🏹',
+            'Phantom': '🌫️'
+        };
+
+        // Phase colors
+        const phaseColors = {
+            'reconnaissance': 'phase-recon',
+            'scanning': 'phase-recon',
+            'enumeration': 'phase-recon',
+            'vulnerability_analysis': 'phase-exploit',
+            'exploitation': 'phase-exploit',
+            'post_exploitation': 'phase-post',
+            'credential_harvesting': 'phase-post',
+            'lateral_movement': 'phase-lateral'
+        };
+
+        // Initialize system
+        async function initSystem() {
+            const apiKey = document.getElementById('apiKeyInput').value;
+            const provider = document.getElementById('llmProvider').value;
+            const model = document.getElementById('modelInput').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/init`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        provider,
+                        api_key: apiKey,
+                        model
+                    })
+                });
+
+                const data = await response.json();
+
+                // Get experts
+                const expertsRes = await fetch(`${API_BASE}/experts`);
+                const expertsData = await expertsRes.json();
+                experts = expertsData.experts;
+
+                // Get team
+                const teamRes = await fetch(`${API_BASE}/team`);
+                const teamData = await teamRes.json();
+                teamMembers = teamData.members;
+
+                // Update UI
+                renderExperts();
+                renderTeam();
+
+                // Update status
+                document.getElementById('llmStatus').textContent = data.llm_available ? 'LLM Active' : 'Rule-based';
+                document.getElementById('llmStatus').className = `status-badge ${data.llm_available ? 'green' : 'yellow'}`;
+
+                // Hide modal
+                document.getElementById('apiKeyModal').classList.add('hidden');
+
+                systemInitialized = true;
+                showToast('System initialized!', 'success');
+
+            } catch (error) {
+                showToast('Initialization failed: ' + error.message, 'error');
+            }
+        }
+
+        // Skip LLM configuration
+        function skipLLM() {
+            initSystem();
+        }
+
+        // Render experts
+        function renderExperts() {
+            const container = document.getElementById('expertList');
+            container.innerHTML = experts.map(expert => `
+                <div class="expert-item" data-type="${expert.type}">
+                    <div class="expert-header">
+                        <span class="expert-name">${expert.name}</span>
+                        <span class="expert-confidence">${(expert.success_rate * 100).toFixed(0)}%</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                        ${expert.role}
+                    </div>
+                    <div class="expert-tools">
+                        ${expert.tools.map(t => `<span class="tool-tag">${t}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render team
+        function renderTeam() {
+            const container = document.getElementById('teamGrid');
+            container.innerHTML = teamMembers.map(member => `
+                <div class="team-member" data-name="${member.name}">
+                    <div class="member-avatar">${avatars[member.name] || '👤'}</div>
+                    <div class="member-name">${member.name}</div>
+                    <div class="member-role">${member.role_display}</div>
+                </div>
+            `).join('');
+        }
+
+        // Start attack simulation
+        async function startAttack() {
+            if (!systemInitialized) {
+                showToast('Please initialize the system first', 'warning');
+                return;
+            }
+
+            const target = {
+                ip: '192.168.1.100',
+                os: 'Linux',
+                ports: {22: 'ssh', 80: 'http', 443: 'https', 445: 'smb', 3306: 'mysql'},
+                vulnerabilities: ['CVE-2021-41773', 'CVE-2017-0144']
+            };
+
+            try {
+                document.getElementById('startBtn').disabled = true;
+
+                const response = await fetch(`${API_BASE}/simulate-full-attack`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(target)
+                });
+
+                const result = await response.json();
+                attackHistory = result.phases;
+
+                // Render timeline
+                renderTimeline();
+
+                // Update stats
+                updateStats(result);
+
+                showToast('Attack simulation complete!', 'success');
+
+            } catch (error) {
+                showToast('Attack failed: ' + error.message, 'error');
+                document.getElementById('startBtn').disabled = false;
+            }
+        }
+
+        // Step through attack
+        async function stepAttack() {
+            if (!systemInitialized || currentStep >= attackHistory.length) {
+                showToast('No more steps available', 'info');
+                return;
+            }
+
+            const step = attackHistory[currentStep];
+            addTimelineItem(step);
+
+            // Update current step display
+            currentStep++;
+            document.getElementById('currentStep').textContent = currentStep;
+
+            // Update expert highlighting
+            highlightExpert(step.routing?.primary?.type);
+
+            // Update team
+            if (step.meeting) {
+                highlightTeamMembers(step.meeting.participants);
+                showMeeting(step.meeting);
+            }
+
+            // Update reward
+            totalReward += step.reward || 0;
+            document.getElementById('totalReward').textContent = totalReward.toFixed(1);
+
+            // Update consensus
+            document.getElementById('consensus').textContent = `${((step.meeting?.consensus || 0) * 100).toFixed(0)}%`;
+
+            // Update progress
+            const progress = (currentStep / attackHistory.length) * 100;
+            document.getElementById('progressFill').style.width = `${progress}%`;
+
+            // Update phase
+            document.getElementById('phaseStatus').textContent = step.phase.toUpperCase();
+        }
+
+        // Render timeline
+        function renderTimeline() {
+            const container = document.getElementById('timeline');
+            container.innerHTML = '';
+
+            attackHistory.forEach((step, idx) => {
+                addTimelineItem(step, idx === 0);
+            });
+        }
+
+        // Add timeline item
+        function addTimelineItem(step, active = false) {
+            const container = document.getElementById('timeline');
+            const phase = step.phase || 'unknown';
+            const colorClass = phaseColors[phase] || 'phase-recon';
+
+            const item = document.createElement('div');
+            item.className = `timeline-item ${active ? 'active' : ''}`;
+            item.innerHTML = `
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-header">
+                        <span class="phase-badge ${colorClass}">${phase}</span>
+                        <span class="reward-badge">+${step.reward || 0}</span>
+                    </div>
+                    <div class="timeline-body">
+                        <p>${step.query || step.phase}</p>
+                        ${step.routing ? `
+                            <div class="routing-info">
+                                <span class="expert-chip primary">${step.routing.primary?.name || '?'} (Primary)</span>
+                                ${step.routing.supporting?.map(s => `
+                                    <span class="expert-chip support">${s.name || '?'}</span>
+                                `).join('') || ''}
+                            </div>
+                        ` : ''}
+                        ${step.advice ? `
+                            <p style="margin-top: 0.5rem; font-size: 0.75rem;">
+                                <strong>Advice:</strong> ${step.advice.summary?.slice(0, 100)}...
+                            </p>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(item);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Highlight expert
+        function highlightExpert(type) {
+            document.querySelectorAll('.expert-item').forEach(el => {
+                el.classList.remove('active');
+                if (el.dataset.type === type) {
+                    el.classList.add('active');
+                }
+            });
+        }
+
+        // Highlight team members
+        function highlightTeamMembers(participants) {
+            document.querySelectorAll('.team-member').forEach(el => {
+                el.classList.remove('active', 'speaking');
+                if (participants && participants.includes(el.dataset.name)) {
+                    el.classList.add('active', 'speaking');
+                    setTimeout(() => el.classList.remove('speaking'), 2000);
+                }
+            });
+        }
+
+        // Show meeting output
+        function showMeeting(meeting) {
+            const container = document.getElementById('meetingOutput');
+            const text = document.getElementById('meetingText');
+
+            container.classList.remove('hidden');
+            text.textContent = `
+Meeting Type: ${meeting.meeting_type || 'Planning'}
+Participants: ${meeting.participants?.join(', ') || 'All'}
+Decisions:
+${meeting.decisions?.map(d => `  - ${d.description || d.action || 'No description'}`).join('\n') || '  No decisions yet'}
+Consensus: ${((meeting.consensus || 0) * 100).toFixed(0)}%
+            `.trim();
+        }
+
+        // Update stats
+        function updateStats(result) {
+            document.getElementById('totalReward').textContent = result.total_reward.toFixed(1);
+            document.getElementById('currentStep').textContent = attackHistory.length;
+            document.getElementById('progressFill').style.width = '100%';
+        }
+
+        // Reset attack
+        function resetAttack() {
+            currentStep = 0;
+            totalReward = 0;
+            attackHistory = [];
+
+            document.getElementById('timeline').innerHTML = `
+                <div class="timeline-item" style="padding-left: 0;">
+                    <div class="timeline-content">
+                        <p style="text-align: center; color: var(--text-secondary);">
+                            Click "Start Attack" to begin the simulation
+                        </p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('currentStep').textContent = '0';
+            document.getElementById('totalReward').textContent = '0';
+            document.getElementById('consensus').textContent = '0%';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('phaseStatus').textContent = 'Idle';
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('meetingOutput').classList.add('hidden');
+
+            document.querySelectorAll('.expert-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.team-member').forEach(el => el.classList.remove('active', 'speaking'));
+        }
+
+        // Toast notification
+        function showToast(message, type = 'info') {
+            const container = document.createElement('div');
+            container.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                color: var(--text-primary);
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            container.textContent = message;
+
+            if (type === 'success') {
+                container.style.borderColor = 'var(--accent-green)';
+            } else if (type === 'error') {
+                container.style.borderColor = 'var(--accent-red)';
+            } else if (type === 'warning') {
+                container.style.borderColor = 'var(--accent-orange)';
+            }
+
+            document.body.appendChild(container);
+
+            setTimeout(() => {
+                container.style.animation = 'slideOut 0.3s ease forwards';
+                setTimeout(() => container.remove(), 300);
+            }, 3000);
+        }
+
+        // Add animation styles
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Initialize on load
+        window.onload = () => {
+            // Pre-fetch experts and team
+            initSystem();
+        };
+    </script>
+</body>
+</html>
