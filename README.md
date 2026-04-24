@@ -23,7 +23,7 @@
 ### 从源码安装
 
 ```bash
-git clone https://github.com/your-repo/password_guesser.git
+git clone https://github.com/RomanCohort/password_guesser.git
 cd password_guesser
 pip install -e .
 ```
