@@ -9,7 +9,7 @@ description = "AI-powered targeted password guessing system using MAMBA + Differ
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your@email.com"}
+    {name = "RomanCohort"}
 ]
 keywords = ["password", "security", "machine-learning", "mamba", "differential-evolution", "pcfg", "hashcat"]
 classifiers = [
@@ -72,9 +72,9 @@ redis = [
 password-guesser = "password_guesser.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/your-repo/password_guesser"
-Documentation = "https://github.com/your-repo/password_guesser#readme"
-Repository = "https://github.com/your-repo/password_guesser.git"
+Homepage = "https://github.com/RomanCohort/password_guesser"
+Documentation = "https://github.com/RomanCohort/password_guesser#readme"
+Repository = "https://github.com/RomanCohort/password_guesser.git"
 
 [tool.setuptools.packages.find]
 where = ["."]
